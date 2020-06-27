@@ -1,7 +1,6 @@
 import numpy as np
 from typing import List
 from utils.serializer import *
-from timeit import default_timer as timer
 
 
 class VotedPerceptron:
@@ -16,37 +15,38 @@ class VotedPerceptron:
             if os.path.isfile(MODEL_SAVE_DIR+filename):
                 self.files.append(filename)
 
-    def __train_perceptrons(self, X: List, Y: np.ndarray, T: int):
+    def __train_perceptrons(self, training_list: List, labels_list: np.ndarray, epochs: int):
         """
         Voted perceptron function.
 
-        This is a generator that yields the tuple (vector, weight) as soon as the current
-        prediction vector makes an error or the examples are finished. This means that only one prediction vector
-        is kept in memory at any time. Actually keeping a list of all prediction vectors would run into MemoryError.
-
-        :param X: Array of examples
-        :param Y: Array of corresponding labels. Each Y[i] must be 1 or -1
-        :param T: Number of epochs
+        :param training_list: Array of examples
+        :param labels_list: Array of corresponding labels. Each labels_list[i] must be 1 or -1
+        :param epochs: Number of epochs
         """
 
-        input_dimension = len(X[0])
+        input_dimension = len(training_list[0])
 
-        k = 0  # numero di errori
-        V = np.zeros(input_dimension, dtype=int)  # coefficienti iperpiano (vettore di previsione)
-        c = 0  # numero di guesses corrette del vettore V attuale (peso votazione)
+        k = 0  # error number
+        pred_vector = np.zeros(input_dimension, dtype=int)  # hyperplane coefficients (prediction vector)
+        weight = 0  # number of correct guesses of the current prediction vector (vote weight)
+        perceptrons_list = []
 
-        for t in range(T):
-            for i in range(len(X)):
-                x = np.array(X[i])
-                yp = np.sign(np.dot(V, x))  # previsione
-                if yp == Y[i]:  # previsione corretta
-                    c += 1
-                else:  # previsione errata
-                    yield V, c  # ritorna vettore precedente (vettore, peso)
-                    V = np.add(V, Y[i]*x)  # aggiorna vettore di previsione sommandogli/sottraendogli il vettore di input
-                    c = 1  # resetta numero di guesses corrette per nuovo vettore (stavolta parte da 1?)
+        for epoch in range(epochs):
+            for i in range(len(training_list)):
+                x = np.array(training_list[i])
+                yp = np.sign(np.dot(pred_vector, x))  # prediction
+                if yp == labels_list[i]:  # correct prediction
+                    weight += 1
+                else:  # wrong prediction
+                    perceptrons_list.append((pred_vector, weight))  # save previous vector (vector, weight)
+                    # update prediction vector summing (if labels_list[i] == 1) or subtracting (if -1) the input vector
+                    pred_vector = np.add(pred_vector, labels_list[i]*x)
+                    weight = 1  # reset correct guesses number for the new vector (starting from 1 this time?)
                     k += 1
-            yield V, c  # ritorna ultimo vettore
+            perceptrons_list.append((pred_vector, weight))  # save last vector
+            if not (epoch+1) % 10 or epoch == epochs-1:  # serialize every 10 epochs to prevent MemoryError
+                yield perceptrons_list
+                perceptrons_list.clear()
 
     def __get_perceptrons_from_file(self, class_num: int):
         if len(self.per_class_percs) > class_num:  # if it was already deserialized just return it
@@ -61,9 +61,9 @@ class VotedPerceptron:
         with Serializer() as serializer:
             try:
                 while 1:
-                    vector, weight = serializer.deserialize(filename)
+                    chunk = serializer.deserialize(filename)
                     # yield vector, weight
-                    perc_list.append((vector, weight))
+                    perc_list += chunk.tolist()
             except FileNotFoundError as e:
                 print(e)
             except:  # End Of File reached
@@ -94,15 +94,13 @@ class VotedPerceptron:
 
         return eval_class, np.sign(weighted_sum)
 
-    def train(self, X: List, Y: List):
+    def train(self, training_list: List, labels_list: List):
         """
-        Uses the voted_perceptron generator function to generate the weighted perceptrons for each label in Y.
+        Uses the __train_perceptrons generator function to generate
+        the weighted perceptrons for each label in labels_list.
 
-        Every tuple (vector, weight) yielded by the generator is yielded along with the current class back to the caller.
-
-        :param X: Array of examples
-        :param Y: Array of corresponding labels
-        :param T: Number of epochs
+        :param training_list: Array of examples
+        :param labels_list: Array of corresponding labels
         """
 
         # our labels have a 10 element domain {0...9}
@@ -116,16 +114,17 @@ class VotedPerceptron:
         self.files = []  # empty the files list when retraining
         for curr_class in range(len(self.classes)):
             mkdir('perceptrons_class'+str(curr_class))
-            Y_new = np.array(Y, dtype=int)  # copy train array
-            for i in range(len(Y_new)):
-                Y_new[i] = 1 if Y_new[i] == curr_class else -1
+            labels_list_normalized = np.array(labels_list, dtype=int)  # copy train array
+            for i in range(len(labels_list_normalized)):
+                labels_list_normalized[i] = 1 if labels_list_normalized[i] == curr_class else -1
 
             # yield (vector, weight) as soon as it is created since putting
             # everything into an array requires too much memory
             with Serializer() as serializer:
                 filename = 'perceptrons_class' + str(curr_class) + '/' + str(self.epochs) + 'epochs.npy'
                 self.files.append(filename)
-                for vector, weight in self.__train_perceptrons(X, Y_new, self.epochs):
-                    serializer.serialize(filename, (vector, weight))
+                for perc_list in self.__train_perceptrons(training_list, labels_list_normalized, self.epochs):
+                    serializer.serialize(filename, perc_list)
 
+            print("Finished training for class {}".format(curr_class))
 
