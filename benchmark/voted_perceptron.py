@@ -12,7 +12,7 @@ class VotedPerceptron:
         # get files if present
         for c in range(len(classes)):
             filename = 'perceptrons_class' + str(c) + '/' + str(self.epochs) + 'epochs.npy'
-            if os.path.isfile(MODEL_SAVE_DIR+filename):
+            if os.path.isfile(DATA_DIR+filename):
                 self.files.append(filename)
 
     def __train_perceptrons(self, training_list: List, labels_list: np.ndarray, epochs: int):
@@ -53,7 +53,7 @@ class VotedPerceptron:
             return self.per_class_percs[class_num]
 
         filename = 'perceptrons_class' + str(class_num) + '/' + str(self.epochs) + 'epochs.npy'
-        if not os.path.isfile(MODEL_SAVE_DIR+filename):
+        if not os.path.isfile(DATA_DIR+filename):
             print("Not yet trained for those parameters")
             raise FileNotFoundError
 
@@ -76,23 +76,33 @@ class VotedPerceptron:
         best_class = None
         best_score = None
         best_perc_list = None
+        score_list = []
         for class_num in range(len(self.classes)):
             perc_list = self.__get_perceptrons_from_file(class_num)
+            score = None
 
-            if method == 'last':
-                score = np.dot(perc_list[-1][0], x)  # use last vector to compute score
-                if best_score is None or score > best_score:
-                    best_class = class_num
-                    best_score = score
-                    best_perc_list = perc_list
+            # compute class score based on the chosen method
+            if method == 'last':  # use last vector
+                score = np.dot(perc_list[-1][0], x)
+            elif method == 'vote':  # weighted sum of every vector in the class
+                score = sum(c * np.sign(np.dot(v, x)) for v, c in perc_list)
+            elif method == 'avg':
+                score = sum(c * np.dot(v, x) for v, c in perc_list)
 
-        return best_class, best_perc_list
+            score_list.insert(class_num, score)
+
+        return score_list
 
     def predict(self, x: List, method: str):
-        eval_class, perc_list = self.__assign_class_score(x, method)
-        weighted_sum = sum(c * np.sign(np.dot(v, x)) for v, c in perc_list)
+        score_list = self.__assign_class_score(x, method)
 
-        return eval_class, np.sign(weighted_sum)
+        eval_class = score_list.index(max(score_list))  # get max score index
+        # score_list.pop(eval_class)  # remove it from the list
+        perc_list = self.__get_perceptrons_from_file(eval_class)
+        weighted_sum = sum(c * np.sign(np.dot(v, x)) for v, c in perc_list)
+        prediction = np.sign(weighted_sum)
+
+        return eval_class, prediction
 
     def train(self, training_list: List, labels_list: List):
         """

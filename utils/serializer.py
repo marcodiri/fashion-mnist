@@ -1,12 +1,14 @@
 import os
 import numpy as np
-from configs import MODEL_SAVE_DIR, touch_dir
+from configs import MODEL_SAVE_DIR, DATA_DIR, touch_dir
+
+DATA_DIR = MODEL_SAVE_DIR + DATA_DIR.split('/')[-1] + "/"
 
 
 def mkdir(base_dir: str = None):
-    touch_dir(MODEL_SAVE_DIR)
+    touch_dir(DATA_DIR)
     if base_dir is not None:
-        touch_dir(MODEL_SAVE_DIR+'/'+base_dir)
+        touch_dir(DATA_DIR+base_dir)
 
 
 class Serializer:
@@ -26,20 +28,20 @@ class Serializer:
     def __set_file(self, filename: str):
         if self.f is None:
             self.filename = filename
-            self.f = open(MODEL_SAVE_DIR+'/'+filename, "wb")
+            self.f = open(DATA_DIR+filename, "wb")
         elif self.filename != filename:
             self.filename = filename
             self.__exit__()
-            self.f = open(MODEL_SAVE_DIR+'/'+filename, "wb")
+            self.f = open(DATA_DIR+filename, "wb")
 
     def __get_file(self, filename: str):
         if self.f is None:
             self.filename = filename
-            self.f = open(MODEL_SAVE_DIR+'/'+filename, "rb")
+            self.f = open(DATA_DIR+filename, "rb")
         elif self.filename != filename:
             self.filename = filename
             self.__exit__()
-            self.f = open(MODEL_SAVE_DIR+'/'+filename, "rb")
+            self.f = open(DATA_DIR+filename, "rb")
 
     def serialize(self, filename, data):
         """
@@ -57,7 +59,7 @@ class Serializer:
 
         :param filename: the name of the file to be deserialized
         """
-        if os.path.isfile(MODEL_SAVE_DIR + filename):
+        if os.path.isfile(DATA_DIR + filename):
             self.__get_file(filename)
             return np.load(self.f, allow_pickle=True)
         else:
