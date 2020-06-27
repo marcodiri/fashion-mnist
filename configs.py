@@ -86,5 +86,5 @@ def get_json_logger(name: str):
     return l
 
 
-LOGGER = _get_logger(__name__)
-JSON_LOGGER = get_json_logger('json' + __name__)
+#LOGGER = _get_logger(__name__)
+#JSON_LOGGER = get_json_logger('json' + __name__)
