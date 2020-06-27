@@ -9,6 +9,7 @@ class VotedPerceptron:
         self.classes = classes
         self.epochs = epochs
         self.per_class_percs = []
+        self.training_mistakes = 0
         # get files if present
         for c in range(len(classes)):
             filename = 'perceptrons_class' + str(c) + '/' + str(self.epochs) + 'epochs.npy'
@@ -43,6 +44,7 @@ class VotedPerceptron:
                     pred_vector = np.add(pred_vector, labels_list[i]*x)
                     weight = 1  # reset correct guesses number for the new vector (starting from 1 this time?)
                     k += 1
+                    self.training_mistakes += 1
             perceptrons_list.append((pred_vector, weight))  # save last vector
             if not (epoch+1) % 10 or epoch == epochs-1:  # serialize every 10 epochs to prevent MemoryError
                 yield perceptrons_list
@@ -73,9 +75,6 @@ class VotedPerceptron:
                 return perc_list
 
     def __assign_class_score(self, x: List, method: str):
-        best_class = None
-        best_score = None
-        best_perc_list = None
         score_list = []
         for class_num in range(len(self.classes)):
             perc_list = self.__get_perceptrons_from_file(class_num)
@@ -95,9 +94,7 @@ class VotedPerceptron:
 
     def predict(self, x: List, method: str):
         score_list = self.__assign_class_score(x, method)
-
         eval_class = score_list.index(max(score_list))  # get max score index
-        # score_list.pop(eval_class)  # remove it from the list
         perc_list = self.__get_perceptrons_from_file(eval_class)
         weighted_sum = sum(c * np.sign(np.dot(v, x)) for v, c in perc_list)
         prediction = np.sign(weighted_sum)

@@ -20,16 +20,14 @@ vp = VotedPerceptron(CLASS_NAMES, N_EPOCHS)
 
 def train():
     start = timer()
-
     vp.train(X_train, Y_train)
-
     end = timer()
-    print(end - start)
+    print("Elapsed time {}".format(end - start))
+    print("Mistakes during training {}".format(vp.training_mistakes))
 
 
 def predict():
     start = timer()
-
     error_count = 0
     correct_count = 0
     unknown_count = 0
@@ -42,7 +40,6 @@ def predict():
         else:
             error_count += 1
         print("{}: Evaluating class {} to {} and it was {}".format(i, eval_class, prediction == 1, Y_test[i]))
-
     end = timer()
     print("Correct: {}, Incorrect: {}, Unknown: {}".format(correct_count, error_count, unknown_count))
     print("Exec time: {}".format(end - start))
